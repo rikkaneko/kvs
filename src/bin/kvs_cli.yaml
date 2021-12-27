@@ -1,0 +1,23 @@
+name: "kvs"
+version: "0.1.0"
+author: "Joe Ma <rikkaneko23@gmail.com>"
+about: "An in-memory key/value store that passes simple tests and responds to command-line arguments."
+args:
+subcommands:
+- set:
+    about: "Set the value of a string key to a string"
+    args:
+    - KEY:
+        required: true
+    - VALUE:
+        required: true
+- get:
+    about: "Get the string value of a given string key"
+    args:
+    - KEY:
+        required: true
+- rm:
+    about: "Remove a given key"
+    args:
+    - KEY:
+        required: true
