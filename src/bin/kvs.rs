@@ -34,7 +34,7 @@ fn main() -> Result<()> {
 			let key = matches.value_of("KEY").unwrap();
 			let value = matches.value_of("VALUE").unwrap();
 			if let Err(err) = kv.set(key.to_string(), value.to_string()) {
-				eprintln!("{}", err.to_string());
+				println!("{}", err.to_string());
 				exit(255);
 			}
 		},
@@ -51,7 +51,7 @@ fn main() -> Result<()> {
 				},
 				
 				Err(err) => {
-					eprintln!("{}", err.to_string());
+					println!("{}", err.to_string());
 					exit(255);
 				}
 			}
@@ -60,12 +60,12 @@ fn main() -> Result<()> {
 		("rm", Some(matches)) => {
 			let key = matches.value_of("KEY").unwrap();
 			if let Err(err) = kv.remove(key.to_string()) {
-				eprintln!("{}", err.to_string());
+				println!("{}", err.to_string());
 				exit(255);
 			}
 		},
 		
-		_ => {}
+		_ => { exit(1); }
 	}
 	
 	Ok(())
