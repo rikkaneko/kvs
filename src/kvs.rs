@@ -94,7 +94,6 @@ impl KvStore {
 	
 	/// Do compaction if the database file size reaches threshold
 	fn compaction(&mut self) -> Result<()> {
-		udighkidjlrhgnilivevudfigttucghl
 		todo!()
 	}
 }
