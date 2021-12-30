@@ -20,16 +20,16 @@
 use failure::{Error, format_err};
 use std::path::PathBuf;
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions, Metadata};
 use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
-use std::os::unix::fs::MetadataExt;
 use serde::{Deserialize, Serialize};
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct KvStore {
 	file_db_handle: File,
 	file_index_handle: File,
-	index: HashMap<String, u64>
+	index: HashMap<String, u64>,
+	modified: bool
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -45,6 +45,7 @@ struct KvIndexEntries {
 }
 
 impl KvStore {
+	const COMPACTION_THERHOLD: u64 = 4*1024; // 128KiB
 	/// Set the value of a string key to a string
 	pub fn set(&mut self, key: String, value: String) -> Result<()> {
 		self.writeback(KvEntries::SET(key, value))?;
@@ -52,20 +53,20 @@ impl KvStore {
 	}
 	
 	/// Get the string value of a given string key
-	pub fn get(&mut self, key: String) -> Result<Option<String>> {
+	pub fn get(&self, key: String) -> Result<Option<String>> {
 		match self.index.get(&key) {
 			Some(value) => {
-				let mut reader = BufReader::new(&mut self.file_db_handle);
+				let mut reader = BufReader::new(self.file_db_handle.try_clone()?);
 				reader.seek(SeekFrom::Start(*value))?;
 				if let Ok(entry) = bson::from_reader::<_, KvEntries>(reader) {
 					if let KvEntries::SET(key_, value) = entry {
 						if key == key_ { return Ok(Some(value)) }
 					}
 				}
-				// Invalid index happened! Reindex and retry once
+				// Invalid index happened!
 				// The database file has been modified externally.
 				// Should not be here
-				panic!("Unknown I/O error.");
+				Err(format_err!("Invalid index! The database file has been modified externally."))
 			},
 			None => Ok(None)
 		}
@@ -89,10 +90,10 @@ impl KvStore {
 			index_path = index_path.with_extension("dir");
 		}
 		
-		let mut file_db_handle = OpenOptions::new().read(true).append(true).create(true).open(db_path)?;
-		let file_index_handle = OpenOptions::new().read(true).append(true).create(true).open(index_path)?;
+		let mut file_db_handle = OpenOptions::new().read(true).write(true).create(true).open(db_path)?;
+		let file_index_handle = OpenOptions::new().read(true).write(true).create(true).open(index_path)?;
 		// Reindex if index file not exist or has zero length
-		let mut index = if file_index_handle.metadata()?.size() == 0 {
+		let mut index = if file_index_handle.metadata()?.len() == 0 {
 			KvStore::reindex(&mut file_db_handle)?
 		} else { HashMap::new() };
 		
@@ -105,7 +106,8 @@ impl KvStore {
 		Ok(KvStore {
 			file_db_handle,
 			file_index_handle,
-			index
+			index,
+			modified: false
 		})
 	}
 	
@@ -115,6 +117,7 @@ impl KvStore {
 		let mut index = HashMap::new();
 		let mut reader = BufReader::new(file_db_handle);
 		reader.seek(SeekFrom::Start(0))?;
+		// Iterate the all entries in the database file
 		while let Ok(entry) = bson::from_reader::<_, KvEntries>(&mut reader) {
 			match entry {
 				KvEntries::SET(key, _) => { index.insert(key, offset); },
@@ -128,7 +131,18 @@ impl KvStore {
 	
 	/// Do compaction if the database file size reaches threshold
 	fn compaction(&mut self) -> Result<()> {
-		todo!()
+		let mut entries = HashMap::new();
+		for (key, offset) in self.index.iter() {
+			if let Some(value) = self.get(key.clone())? {
+				entries.insert(key.clone(), value);
+			}
+		}
+		self.file_db_handle.set_len(0)?;
+		self.index.clear();
+		for (key, value) in entries {
+			self.writeback(KvEntries::SET(key, value))?;
+		}
+		Ok(())
 	}
 	
 	fn writeback(&mut self, entry: KvEntries) -> Result<()> {
@@ -139,10 +153,16 @@ impl KvStore {
 			KvEntries::SET(key, _) => { self.index.insert(key, offset); },
 			KvEntries::DELETE(key) => { self.index.remove(&key); }
 		}
+		self.modified = true;
+		if self.file_db_handle.metadata()?.len() > KvStore::COMPACTION_THERHOLD {
+			self.compaction()?;
+		}
 		Ok(())
 	}
 	
 	fn write_index(&mut self) -> Result<()> {
+		// Skip rewriting index if the database has not been modified
+		if !self.modified { return Ok(()) }
 		self.file_index_handle.set_len(0)?;
 		let mut writer = BufWriter::new(&mut self.file_index_handle);
 		// Truncate file won't change the cursor
@@ -167,7 +187,7 @@ impl Drop for KvStore {
 
 #[test]
 fn test_kv() -> Result<()> {
-	let mut store = KvStore::open("/tmp")?;
+	let mut store = KvStore::open("kvs.db")?;
 	store.set("user.root.password".to_string(), "archlinuxisthebest".to_string())?;
 	store.set("user.root.name".to_string(), "系統管理員".to_string())?;
 	store.set("user.root.balance".to_string(), "50000".to_string())?;
@@ -179,5 +199,12 @@ fn test_kv() -> Result<()> {
 	assert_eq!(store.get("user.root.name".to_string())?, Some("神".to_string()));
 	assert_eq!(store.get("user.root.password".to_string())?, Some("archlinuxforever".to_string()));
 	assert_eq!(store.get("user.root.balance".to_string())?, Some("0".to_string()));
+	Ok(())
+}
+
+#[test]
+fn test_kv_compact() -> Result<()> {
+	let mut store = KvStore::open("kvs.db")?;
+	store.compaction()?;
 	Ok(())
 }
