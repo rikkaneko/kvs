@@ -20,7 +20,7 @@
 use failure::{Error, format_err};
 use std::path::PathBuf;
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions, Metadata};
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
 use serde::{Deserialize, Serialize};
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -45,7 +45,7 @@ struct KvIndexEntries {
 }
 
 impl KvStore {
-	const COMPACTION_THERHOLD: u64 = 4*1024; // 128KiB
+	const COMPACTION_THERHOLD: u64 = 128*1024; // 128KiB
 	/// Set the value of a string key to a string
 	pub fn set(&mut self, key: String, value: String) -> Result<()> {
 		self.writeback(KvEntries::SET(key, value))?;
@@ -132,7 +132,7 @@ impl KvStore {
 	/// Do compaction if the database file size reaches threshold
 	fn compaction(&mut self) -> Result<()> {
 		let mut entries = HashMap::new();
-		for (key, offset) in self.index.iter() {
+		for (key, _) in self.index.iter() {
 			if let Some(value) = self.get(key.clone())? {
 				entries.insert(key.clone(), value);
 			}
