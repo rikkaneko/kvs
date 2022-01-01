@@ -17,19 +17,32 @@
  */
 
 #![allow(clippy::collapsible_match)]
-use failure::{Error, format_err};
 use std::path::PathBuf;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
 use serde::{Deserialize, Serialize};
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+use thiserror::Error;
+pub type Result<T> = std::result::Result<T, KvError>;
 
+#[derive(Debug)]
 pub struct KvStore {
 	file_db_handle: File,
 	file_index_handle: File,
 	index: HashMap<String, u64>,
 	modified: bool
+}
+
+#[derive(Error, Debug)]
+pub enum KvError {
+	#[error("I/O error")]
+	IOError(#[from] std::io::Error),
+	#[error(r#"Key "{0}" does not exist"#)]
+	KeyNotExist(String),
+	#[error("Invalid index detected. The database file has been modified externally")]
+	InvalidIndex,
+	#[error("Serialization Error")]
+	SerializationError(#[from] bson::ser::Error)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -66,7 +79,7 @@ impl KvStore {
 				// Invalid index happened!
 				// The database file has been modified externally.
 				// Should not be here
-				Err(format_err!("Invalid index! The database file has been modified externally."))
+				Err(KvError::InvalidIndex)
 			},
 			None => Ok(None)
 		}
@@ -74,7 +87,7 @@ impl KvStore {
 	
 	/// Remove a given key `key`
 	pub fn remove(&mut self, key: String) -> Result<()> {
-		if self.get(key.clone())?.is_none() { return Err(format_err!("Key not found")) }
+		if self.get(key.clone())?.is_none() { return Err(KvError::KeyNotExist(key)) }
 		self.writeback(KvEntries::DELETE(key))?;
 		Ok(())
 	}
