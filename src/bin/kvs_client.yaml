@@ -1,8 +1,14 @@
-name: "kvs-cli"
+name: "kvs-client"
 version: "0.1.0"
 author: "Joe Ma <rikkaneko23@gmail.com>"
-about: "An in-memory key/value store that passes simple tests and responds to command-line arguments."
+about: "A command-line key-value store client to speak to kvs-server."
 args:
+- addr:
+    long: "addr"
+    help: "Specify an IP address, either v4 or v6, and a port number, with the format IP:PORT. If --addr is not specified then connect on 127.0.0.1:4000."
+    value_name: "IP-PORT"
+    takes_value: true
+    
 subcommands:
 - set:
     about: "Set the value of a string key to a string"

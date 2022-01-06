@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 use assert_cmd::prelude::*;
-use kvs::kvs::{KvStore, Result};
+use kvs::kvs::{KvsEngine, KvStore, Result};
 use predicates::ord::eq;
 use predicates::str::{contains, is_empty, PredicateStrExt};
 use std::process::Command;

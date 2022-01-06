@@ -17,32 +17,67 @@
  */
 
 #![allow(clippy::collapsible_match)]
+use std::cell::RefCell;
+use std::cmp::max;
 use std::path::PathBuf;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 pub type Result<T> = std::result::Result<T, KvError>;
 
+const KV_BUILD_NUMBER: u64 = 1000;
+const KV_MIN_COMPACTION_THRESHOLD: u64 = 8192;
+
 #[derive(Debug)]
 pub struct KvStore {
+	header: KvHeader,
 	file_db_handle: File,
 	file_index_handle: File,
 	index: HashMap<String, u64>,
+	is_compaction: bool,
 	modified: bool
+}
+
+pub struct KvsServer {
+	store: Arc<RefCell<dyn KvsEngine>>
+}
+
+/// `KvsEngine` Defines the storage interface called by KvsServer
+pub trait KvsEngine {
+	/// Get the string value of a given string key
+	fn set(&mut self, key: String, value: String) -> Result<()>;
+	/// Get the string value of a given string key
+	fn get(&self, key: String) -> Result<Option<String>>;
+	/// Remove a given key `key`
+	fn remove(&mut self, key: String) -> Result<()>;
+	/// Create or open KvStore instance
+	fn open(path: impl Into<PathBuf>) -> Result<Self> where Self: Sized;
 }
 
 #[derive(Error, Debug)]
 pub enum KvError {
-	#[error("I/O error")]
+	#[error(transparent)]
 	IOError(#[from] std::io::Error),
 	#[error(r#"Key "{0}" does not exist"#)]
 	KeyNotExist(String),
 	#[error("Invalid index detected. The database file has been modified externally")]
 	InvalidIndex,
-	#[error("Serialization Error")]
-	SerializationError(#[from] bson::ser::Error)
+	#[error(transparent)]
+	SerializationError(#[from] bson::ser::Error),
+	#[error(transparent)]
+	DeserializationError(#[from] bson::de::Error),
+	#[error("Unsupported Engine")]
+	UnsupportedEngine,
+	#[error("Cannot open the database file")]
+	InvalidDatabaseFormat,
+	#[error("Found incompatible database version {0}, current version {}")]
+	IncompatibleDatabaseVersion(u64, u64),
+	#[error(transparent)]
+	SystemTimeError(#[from] std::time::SystemTimeError)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -57,16 +92,22 @@ struct KvIndexEntries {
 	offset: u64
 }
 
-impl KvStore {
-	const COMPACTION_THERHOLD: u64 = 128*1024; // 128KiB
+#[derive(Serialize, Deserialize, Debug)]
+struct KvHeader {
+	build_number: u64,
+	last_open: u64,
+	next_compaction_size: u64 // in byte
+}
+
+impl KvsEngine for KvStore {
 	/// Set the value of a string key to a string
-	pub fn set(&mut self, key: String, value: String) -> Result<()> {
+	fn set(&mut self, key: String, value: String) -> Result<()> {
 		self.writeback(KvEntries::SET(key, value))?;
 		Ok(())
 	}
 	
 	/// Get the string value of a given string key
-	pub fn get(&self, key: String) -> Result<Option<String>> {
+	fn get(&self, key: String) -> Result<Option<String>> {
 		match self.index.get(&key) {
 			Some(value) => {
 				let mut reader = BufReader::new(self.file_db_handle.try_clone()?);
@@ -86,14 +127,14 @@ impl KvStore {
 	}
 	
 	/// Remove a given key `key`
-	pub fn remove(&mut self, key: String) -> Result<()> {
+	fn remove(&mut self, key: String) -> Result<()> {
 		if self.get(key.clone())?.is_none() { return Err(KvError::KeyNotExist(key)) }
 		self.writeback(KvEntries::DELETE(key))?;
 		Ok(())
 	}
 	
 	/// Create or open KvStore instance
-	pub fn open(path: impl Into<PathBuf>) -> Result<KvStore> {
+	fn open(path: impl Into<PathBuf>) -> Result<KvStore> {
 		let mut db_path = path.into();
 		let mut index_path = db_path.clone();
 		if db_path.is_dir() {
@@ -104,32 +145,65 @@ impl KvStore {
 		}
 		
 		let mut file_db_handle = OpenOptions::new().read(true).write(true).create(true).open(db_path)?;
-		let file_index_handle = OpenOptions::new().read(true).write(true).create(true).open(index_path)?;
+		let mut file_index_handle = OpenOptions::new().read(true).write(true).create(true).open(index_path)?;
+		
+		// Check the present of the database header
+		let mut header = if file_db_handle.metadata()?.len() != 0 {
+			let mut reader = BufReader::new(&mut file_db_handle);
+			match bson::from_reader::<_, KvHeader>(&mut reader) {
+				Ok(header_entry) => header_entry,
+				Err(_) => { return Err(KvError::InvalidDatabaseFormat) }
+			}
+			// Blank database file
+		} else {
+			KvHeader {
+				build_number: KV_BUILD_NUMBER,
+				last_open: 0,
+				next_compaction_size: KV_MIN_COMPACTION_THRESHOLD
+			}
+		};
+		
+		// Check version
+		if header.build_number != KV_BUILD_NUMBER {
+			return Err(KvError::IncompatibleDatabaseVersion(header.build_number, KV_BUILD_NUMBER))
+		}
+		
+		// Update last_open timestamp
+		header.last_open = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64;
+		file_db_handle.seek(SeekFrom::Start(0))?;
+		file_db_handle.write_all(bson::to_vec(&header)?.as_slice())?;
+		
 		// Reindex if index file not exist or has zero length
 		let mut index = if file_index_handle.metadata()?.len() == 0 {
 			KvStore::reindex(&mut file_db_handle)?
 		} else { HashMap::new() };
 		
-		let mut reader = BufReader::new(file_index_handle.try_clone()?);
+		let mut reader = BufReader::new(&mut file_index_handle);
 		// Build index from existing index file
 		while let Ok(entry) = bson::from_reader::<_, KvIndexEntries>(&mut reader) {
 			index.insert(entry.key, entry.offset);
 		}
 		
 		Ok(KvStore {
+			header,
 			file_db_handle,
 			file_index_handle,
 			index,
+			is_compaction: false,
 			modified: false
 		})
 	}
-	
+}
+
+impl KvStore {
 	/// Re-index the database file
 	fn reindex(file_db_handle: &mut File) -> Result<HashMap<String, u64>> {
 		let mut offset = 0;
 		let mut index = HashMap::new();
 		let mut reader = BufReader::new(file_db_handle);
 		reader.seek(SeekFrom::Start(0))?;
+		// Skip header
+		bson::from_reader::<_, KvHeader>(&mut reader)?;
 		// Iterate the all entries in the database file
 		while let Ok(entry) = bson::from_reader::<_, KvEntries>(&mut reader) {
 			match entry {
@@ -144,6 +218,9 @@ impl KvStore {
 	
 	/// Do compaction if the database file size reaches threshold
 	fn compaction(&mut self) -> Result<()> {
+		// Incident the ongoing compaction
+		// Avoid recursive calling of compaction() when the database file does not contain enough redundant entries
+		self.is_compaction = true;
 		let mut entries = HashMap::new();
 		for (key, _) in self.index.iter() {
 			if let Some(value) = self.get(key.clone())? {
@@ -151,10 +228,17 @@ impl KvStore {
 			}
 		}
 		self.file_db_handle.set_len(0)?;
+		// Build header
+		self.update_header()?;
 		self.index.clear();
 		for (key, value) in entries {
 			self.writeback(KvEntries::SET(key, value))?;
 		}
+		// Estimate next compaction size: Double the current size
+		self.header.next_compaction_size = max(self.file_db_handle.metadata()?.len() * 2, KV_MIN_COMPACTION_THRESHOLD);
+		self.update_header()?;
+		// Incident the end of compaction
+		self.is_compaction = false;
 		Ok(())
 	}
 	
@@ -167,7 +251,8 @@ impl KvStore {
 			KvEntries::DELETE(key) => { self.index.remove(&key); }
 		}
 		self.modified = true;
-		if self.file_db_handle.metadata()?.len() > KvStore::COMPACTION_THERHOLD {
+		// Avoid recursive calling of compaction()
+		if !self.is_compaction && self.file_db_handle.metadata()?.len() > self.header.next_compaction_size {
 			self.compaction()?;
 		}
 		Ok(())
@@ -190,11 +275,33 @@ impl KvStore {
 		}
 		Ok(())
 	}
+	
+	/// Update database file header
+	fn update_header(&mut self) -> Result<()> {
+		self.file_db_handle.seek(SeekFrom::Start(0))?;
+		let serialized = bson::to_vec(&self.header)?;
+		self.file_db_handle.write_all(serialized.as_slice())?;
+		Ok(())
+	}
 }
 
 impl Drop for KvStore {
 	fn drop(&mut self) {
 		self.write_index().unwrap();
+	}
+}
+
+impl KvsServer {
+	pub fn open(engine_type: &str, path: impl Into<PathBuf>) -> Result<KvsServer> {
+		unimplemented!()
+	}
+	
+	pub fn start(&mut self) -> Result<()> {
+		unimplemented!()
+	}
+	
+	pub fn terminate(&mut self) -> Result<()> {
+		unimplemented!()
 	}
 }
 
