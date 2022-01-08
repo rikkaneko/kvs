@@ -20,7 +20,7 @@
 extern crate clap;
 use std::process::exit;
 use clap::App;
-use kvs::kvs::{KvsEngine, KvStore, Result, KvError};
+use kvs::kvs::{KvsEngine, KvStore, Result, KvsError};
 
 fn main() -> Result<()> {
 	let yaml = load_yaml!("kvs_cli.yaml");
@@ -33,7 +33,7 @@ fn main() -> Result<()> {
 		("set", Some(matches)) => {
 			let key = matches.value_of("KEY").unwrap();
 			let value = matches.value_of("VALUE").unwrap();
-			if let Err(KvError::KeyNotExist(_)) = kv.set(key.to_string(), value.to_string()) {
+			if let Err(KvsError::KeyNotExist(_)) = kv.set(key.to_string(), value.to_string()) {
 				println!("Key not found");
 				exit(255);
 			}
@@ -59,7 +59,7 @@ fn main() -> Result<()> {
 		
 		("rm", Some(matches)) => {
 			let key = matches.value_of("KEY").unwrap();
-			if let Err(KvError::KeyNotExist(_)) = kv.remove(key.to_string()) {
+			if let Err(KvsError::KeyNotExist(_)) = kv.remove(key.to_string()) {
 				println!("Key not found");
 				exit(255);
 			}

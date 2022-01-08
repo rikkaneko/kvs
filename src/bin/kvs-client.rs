@@ -20,7 +20,7 @@
 extern crate clap;
 use std::process::exit;
 use clap::App;
-use kvs::kvs::{KvsEngine, KvStore, Result, KvError};
+use kvs::kvs::{Result, KvsError, KvsClient};
 
 
 fn main() -> Result<()> {
@@ -29,10 +29,53 @@ fn main() -> Result<()> {
 		.version(env!("CARGO_PKG_VERSION"))
 		.get_matches();
 	
+	let addr = if let Some(addr) = args.value_of("addr") { addr } else { "127.0.0.1:4000" };
+	
+	let mut kv = KvsClient::open(addr)?;
+	
 	match args.subcommand() {
-		_ => {
-			unimplemented!()
+		("set", Some(matches)) => {
+			let key = matches.value_of("KEY").unwrap();
+			let value = matches.value_of("VALUE").unwrap();
+			if let Err(KvsError::KeyNotExist(_)) = kv.set(key.to_string(), value.to_string()) {
+				println!("Key not found");
+				exit(255);
+			}
+		},
+		
+		("get", Some(matches)) => {
+			let key = matches.value_of("KEY").unwrap();
+			match kv.get(key.to_string()) {
+				Ok(result) => {
+					if let Some(value) = result {
+						println!("{}", value);
+					} else {
+						println!("Key not found");
+					}
+				},
+				
+				Err(err) => {
+					println!("{}", err.to_string());
+					exit(255);
+				}
+			}
+		},
+		
+		("rm", Some(matches)) => {
+			let key = matches.value_of("KEY").unwrap();
+			if let Err(KvsError::KeyNotExist(_)) = kv.remove(key.to_string()) {
+				println!("Key not found");
+				exit(255);
+			}
+		},
+		
+		("terminate", _) => {
+			if kv.send_terminate_signal().is_err() {
+				exit(255);
+			}
 		}
+		
+		_ => { exit(1); }
 	}
 	
 	Ok(())

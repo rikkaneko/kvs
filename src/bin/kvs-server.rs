@@ -18,9 +18,8 @@
 
 #[macro_use]
 extern crate clap;
-use std::process::exit;
 use clap::App;
-use kvs::kvs::{Result, KvError, KvsServer};
+use kvs::kvs::{Result, KvsServer};
 
 fn main() -> Result<()> {
 	let yaml = load_yaml!("kvs_server.yaml");
@@ -28,17 +27,13 @@ fn main() -> Result<()> {
 		.version(env!("CARGO_PKG_VERSION"))
 		.get_matches();
 	
-	let addr = if let Some(addr) = args.value_of("addr") {
-		println!("The server is listening on {}", addr);
-		addr
-	} else { "127.0.0.1:4000" };
+	let addr = args.value_of("addr").map_or("127.0.0.1:4000", |x| x);
+	let engine = args.value_of("engine").map_or("kvs", |x| x);
+	let path = args.value_of("basedir").map_or(".", |x| x);
 	
-	let engine = if let Some(engine) = args.value_of("engine") {
-		println!("Database engine: {}", engine);
-		engine
-	} else { "kvs" };
-	
-	KvsServer::open(engine, addr)?.start()?;
+	println!("Database engine: {}", engine);
+	println!("The server is listening on {}", addr);
+	KvsServer::open(engine, path)?.start(addr)?;
 	
 	Ok(())
 }

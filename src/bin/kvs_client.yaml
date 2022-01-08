@@ -17,6 +17,7 @@ subcommands:
         required: true
     - VALUE:
         required: true
+        
 - get:
     about: "Get the string value of a given string key"
     args:
@@ -27,3 +28,6 @@ subcommands:
     args:
     - KEY:
         required: true
+        
+- terminate:
+    about: "Terminate remote server"
