@@ -16,8 +16,9 @@ walkdir = "2.2.7"
 
 [dependencies]
 clap = { version = "2.34.0", features = ["yaml"] }
-serde = { version = "^1.0", features = ["derive"] }
-bson = "^2.1"
-thiserror = "^1.0"
-slog = "^2.7"
-sled = "^0.34"
+serde = { version = "~1.0.133", features = ["derive"] }
+bson = "~2.1"
+thiserror = "~1.0.30"
+slog = "~2.7.0"
+sled = "~0.34.7"
+signal-hook = "~0.3.13"

@@ -18,10 +18,14 @@
 
 #[macro_use]
 extern crate clap;
+use std::{env, thread};
 use clap::App;
-use kvs::kvs::{Result, KvsServer};
+use signal_hook::consts::{SIGINT, SIGTERM};
+use signal_hook::iterator::Signals;
+use kvs::kvs::{Result, KvsServer, KvsClient};
 
 fn main() -> Result<()> {
+	let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
 	let yaml = load_yaml!("kvs_server.yaml");
 	let args = App::from_yaml(yaml)
 		.version(env!("CARGO_PKG_VERSION"))
@@ -30,9 +34,20 @@ fn main() -> Result<()> {
 	let addr = args.value_of("addr").unwrap();
 	let engine = args.value_of("engine").unwrap();
 	let path = args.value_of("basedir").unwrap();
+	let _addr = addr.to_owned();
+	
+	// Signal handler
+	thread::spawn(move || -> Result<()> {
+		for _ in signals.forever() {
+			KvsClient::open(&_addr)?.send_terminate_signal()?;
+			println!("Terminated by signal.");
+		}
+		Ok(())
+	});
 	
 	println!("Database engine: {}", engine);
 	println!("The server is listening on {}", addr);
+	println!("Working directory: {} ({})", path, env::current_dir()?.to_str().unwrap());
 	KvsServer::open(engine, path)?.start(addr)?;
 	
 	Ok(())
