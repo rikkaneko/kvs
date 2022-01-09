@@ -3,6 +3,14 @@ version: "0.1.0"
 author: "Joe Ma <rikkaneko23@gmail.com>"
 about: "An in-memory key/value store that passes simple tests and responds to command-line arguments."
 args:
+- basedir:
+    long: "base-dir"
+    help: "Specify the base directory for database files. If --base-dir is not specified then the default path would be the current directory."
+    value_name: "PATH"
+    takes_value: true
+    global: true
+    default_value: "."
+    
 subcommands:
 - set:
     about: "Set the value of a string key to a string"

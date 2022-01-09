@@ -29,7 +29,7 @@ fn main() -> Result<()> {
 		.version(env!("CARGO_PKG_VERSION"))
 		.get_matches();
 	
-	let addr = if let Some(addr) = args.value_of("addr") { addr } else { "127.0.0.1:4000" };
+	let addr = args.value_of("addr").unwrap();
 	
 	let mut kv = KvsClient::open(addr)?;
 	
@@ -64,7 +64,7 @@ fn main() -> Result<()> {
 		("rm", Some(matches)) => {
 			let key = matches.value_of("KEY").unwrap();
 			if let Err(KvsError::KeyNotExist(_)) = kv.remove(key.to_string()) {
-				println!("Key not found");
+				eprintln!("Key not found");
 				exit(255);
 			}
 		},

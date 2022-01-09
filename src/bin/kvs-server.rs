@@ -27,9 +27,9 @@ fn main() -> Result<()> {
 		.version(env!("CARGO_PKG_VERSION"))
 		.get_matches();
 	
-	let addr = args.value_of("addr").map_or("127.0.0.1:4000", |x| x);
-	let engine = args.value_of("engine").map_or("kvs", |x| x);
-	let path = args.value_of("basedir").map_or(".", |x| x);
+	let addr = args.value_of("addr").unwrap();
+	let engine = args.value_of("engine").unwrap();
+	let path = args.value_of("basedir").unwrap();
 	
 	println!("Database engine: {}", engine);
 	println!("The server is listening on {}", addr);
