@@ -18,14 +18,17 @@
 
 #[macro_use]
 extern crate clap;
-use std::{env, thread};
+use std::env;
+use std::path::PathBuf;
+use std::process::exit;
 use clap::App;
-use signal_hook::consts::{SIGINT, SIGTERM};
-use signal_hook::iterator::Signals;
+#[cfg(target_os = "linux")]
+use signal_hook::{consts::{SIGINT, SIGTERM}, iterator::Signals};
 use kvs::kvs::{Result, KvsServer, KvsClient};
 
 fn main() -> Result<()> {
-	let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
+	#[cfg(target_os = "linux")]
+		let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
 	let yaml = load_yaml!("kvs_server.yaml");
 	let args = App::from_yaml(yaml)
 		.version(env!("CARGO_PKG_VERSION"))
@@ -37,13 +40,30 @@ fn main() -> Result<()> {
 	let _addr = addr.to_owned();
 	
 	// Signal handler
-	thread::spawn(move || -> Result<()> {
-		for _ in signals.forever() {
-			KvsClient::open(&_addr)?.send_terminate_signal()?;
-			println!("Terminated by signal.");
-		}
-		Ok(())
-	});
+	// Currently only support Linux for signal handling
+	// TODO Signal handling for Windows platform
+	#[cfg(target_os = "linux")] {
+		use std::thread;
+		thread::spawn(move || -> Result<()> {
+			for _ in signals.forever() {
+				// Send the termination signal
+				KvsClient::open(&_addr)?.send_terminate_signal()?;
+				println!("Terminated by signal.");
+			}
+			Ok(())
+		});
+	}
+	
+	// Check previously used database engine
+	// kvs: kvs.db and kvs.dir
+	// sled: db, config and blob directory
+	let db_path = PathBuf::from(path);
+	if (db_path.join("kvs.db").exists() && engine != "kvs")
+		|| (db_path.join("db").exists() && engine != "sled") {
+		eprintln!("{} had been used with {} engine already.", env::current_dir()?.to_str().unwrap(), engine);
+		println!("Consider change the working directory with --base-dir options.");
+		exit(255);
+	}
 	
 	println!("Database engine: {}", engine);
 	println!("The server is listening on {}", addr);
