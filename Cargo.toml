@@ -20,7 +20,10 @@ serde = { version = "~1.0.133", features = ["derive"] }
 bson = "~2.1"
 thiserror = "~1.0.30"
 slog = "~2.7.0"
+slog-term = "~2.8.0"
+slog-async = "~2.7.0"
 sled = "~0.34.7"
+quit = "~1.1.4"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "~0.3.13"

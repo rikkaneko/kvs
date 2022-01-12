@@ -17,18 +17,21 @@
  */
 
 #[macro_use]
+extern crate slog;
+#[macro_use]
 extern crate clap;
-use std::env;
+use std::{env, thread};
+use std::fs::OpenOptions;
 use std::path::PathBuf;
-use std::process::exit;
 use clap::App;
 #[cfg(target_os = "linux")]
 use signal_hook::{consts::{SIGINT, SIGTERM}, iterator::Signals};
 use kvs::kvs::{Result, KvsServer, KvsClient};
+use slog::{Duplicate, Drain, info, Logger};
+use slog_term::{FullFormat, PlainDecorator, TermDecorator};
+use slog_async::{Async};
 
 fn main() -> Result<()> {
-	#[cfg(target_os = "linux")]
-		let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
 	let yaml = load_yaml!("kvs_server.yaml");
 	let args = App::from_yaml(yaml)
 		.version(env!("CARGO_PKG_VERSION"))
@@ -36,19 +39,28 @@ fn main() -> Result<()> {
 	
 	let addr = args.value_of("addr").unwrap();
 	let engine = args.value_of("engine").unwrap();
-	let path = args.value_of("basedir").unwrap();
-	let _addr = addr.to_owned();
+	let path = PathBuf::from(args.value_of("basedir").unwrap()).canonicalize()?;
+	
+	let logfile = OpenOptions::new().create(true).write(true).truncate(true).open(path.join("stderr"))?;
+	let term_drain = FullFormat::new(TermDecorator::new().build()).build();
+	let file_drain = FullFormat::new(PlainDecorator::new(logfile)).build();
+	let drains = Duplicate::new(term_drain, file_drain).fuse();
+	let (drain, guard) = Async::new(drains).build_with_guard();
+	let logger = Logger::root(drain.fuse(), o!());
+	
 	
 	// Signal handler
 	// Currently only support Linux for signal handling
 	// TODO Signal handling for Windows platform
 	#[cfg(target_os = "linux")] {
-		use std::thread;
+		let _addr = addr.to_owned();
+		let _logger = logger.clone();
+		let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
 		thread::spawn(move || -> Result<()> {
-			for _ in signals.forever() {
+			if let Some(_) = signals.forever().next() {
 				// Send the termination signal
 				KvsClient::open(&_addr)?.send_terminate_signal()?;
-				println!("Terminated by signal.");
+				warn!(_logger, "Terminated by signal");
 			}
 			Ok(())
 		});
@@ -57,18 +69,20 @@ fn main() -> Result<()> {
 	// Check previously used database engine
 	// kvs: kvs.db and kvs.dir
 	// sled: db, config and blob directory
-	let db_path = PathBuf::from(path);
-	if (db_path.join("kvs.db").exists() && engine != "kvs")
-		|| (db_path.join("db").exists() && engine != "sled") {
-		eprintln!("{} had been used with {} engine already.", env::current_dir()?.to_str().unwrap(), engine);
-		println!("Consider change the working directory with --base-dir options.");
-		exit(255);
+	if (path.join("kvs.db").exists() && engine != "kvs")
+		|| (path.join("db").exists() && engine != "sled") {
+		error!(logger, "Conflicted engine detected";
+			"path" => path.to_str().unwrap(), "engine" => engine);
+		info!(logger, "Consider change the working directory with --base-dir options.");
+		quit::with_code(255);
+		// It is the most weird thing I known in Rust that std::process::exit() does not call destructor ¯\_ಠ_ಠ_/¯
+		// exit(255);
 	}
 	
-	println!("Database engine: {}", engine);
-	println!("The server is listening on {}", addr);
-	println!("Working directory: {} ({})", path, env::current_dir()?.to_str().unwrap());
-	KvsServer::open(engine, path)?.start(addr)?;
+	info!(logger, "kvs-server";
+		"addr" => addr, "path" => path.to_str().unwrap(), "engine" => engine, "version" => env!("CARGO_PKG_VERSION"));
 	
+	KvsServer::open(engine, path)?.start(addr)?;
+	info!(logger, "Server shutdown gratefully");
 	Ok(())
 }
