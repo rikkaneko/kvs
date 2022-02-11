@@ -249,20 +249,3 @@ impl Drop for KvStore {
 		self.update_header().unwrap();
 	}
 }
-
-#[test]
-fn test_kv() -> Result<()> {
-	let mut store = KvStore::open("/tmp").expect("Cannot open the database file.");
-	store.set("user.root.password".to_owned(), "archlinuxisthebest".to_owned())?;
-	store.set("user.root.name".to_owned(), "系統管理員".to_owned())?;
-	store.set("user.root.balance".to_owned(), "50000".to_owned())?;
-	store.set("user.root.money".to_owned(), "100000".to_owned())?;
-	store.remove("user.root.money".to_owned())?;
-	store.set("user.root.balance".to_owned(), "0".to_owned())?;
-	store.set("user.root.password".to_owned(), "archlinuxforever".to_owned())?;
-	store.set("user.root.name".to_owned(), "神".to_owned())?;
-	assert_eq!(store.get("user.root.name".to_owned())?, Some("神".to_owned()));
-	assert_eq!(store.get("user.root.password".to_owned())?, Some("archlinuxforever".to_owned()));
-	assert_eq!(store.get("user.root.balance".to_owned())?, Some("0".to_owned()));
-	Ok(())
-}

@@ -13,9 +13,11 @@ assert_cmd = "0.11.0"
 predicates = "1.0.0"
 tempfile = "3.0.7"
 walkdir = "2.2.7"
+criterion = "0.3"
+rand = "0.8.4"
 
 [dependencies]
-clap = { version = "2.34.0", features = ["yaml"] }
+clap = { version = "~2.34.0", features = ["yaml"] }
 serde = { version = "~1.0.133", features = ["derive"] }
 bson = "~2.1"
 thiserror = "~1.0.30"
@@ -27,3 +29,8 @@ quit = "~1.1.4"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "~0.3.13"
+
+[[bench]]
+name = "kvs"
+harness = false
+path = "benches/kvs.rs"

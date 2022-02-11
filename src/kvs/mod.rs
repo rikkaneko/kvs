@@ -29,7 +29,7 @@ pub use self::engine::KvsEngine;
 pub use self::server::KvsServer;
 pub use self::client::KvsClient;
 pub use self::errors::{KvsError, Result};
+pub use self::sled::SledKvsEngine;
 
 // Internal use
-use self::sled::SledKvsEngine;
 use self::server::{KvsCmdRequest, KvsServerReply, KvsServerReplyStatus};

@@ -45,7 +45,7 @@ fn main() -> Result<()> {
 	let term_drain = FullFormat::new(TermDecorator::new().build()).build();
 	let file_drain = FullFormat::new(PlainDecorator::new(logfile)).build();
 	let drains = Duplicate::new(term_drain, file_drain).fuse();
-	let (drain, guard) = Async::new(drains).build_with_guard();
+	let (drain, _guard) = Async::new(drains).build_with_guard();
 	let logger = Logger::root(drain.fuse(), o!());
 	
 	
@@ -57,7 +57,7 @@ fn main() -> Result<()> {
 		let _logger = logger.clone();
 		let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
 		thread::spawn(move || -> Result<()> {
-			if let Some(_) = signals.forever().next() {
+			if signals.forever().next().is_some() {
 				// Send the termination signal
 				KvsClient::open(&_addr)?.send_terminate_signal()?;
 				warn!(_logger, "Terminated by signal");
