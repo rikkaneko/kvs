@@ -1,41 +1,45 @@
 Benchmarking kvs_write
 Benchmarking kvs_write: Warming up for 3.0000 s
-Benchmarking kvs_write: Collecting 100 samples in estimated 5.0777 s (2400 iterations)
+Benchmarking kvs_write: Collecting 100 samples in estimated 5.0087 s (2200 iterations)
 Benchmarking kvs_write: Analyzing
-kvs_write               time:   [2.1083 ms 2.1125 ms 2.1166 ms]
-                        change: [-11.854% -11.597% -11.326%] (p = 0.00 < 0.05)
-                        Performance has improved.
-Found 10 outliers among 100 measurements (10.00%)
-  10 (10.00%) low mild
+kvs_write               time:   [2.2750 ms 2.2808 ms 2.2870 ms]
+                        change: [-1.2519% -0.8921% -0.5341%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 22 outliers among 100 measurements (22.00%)
+  12 (12.00%) low severe
+  8 (8.00%) low mild
+  2 (2.00%) high severe
 
 Benchmarking sled_write
 Benchmarking sled_write: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.3s, enable flat sampling, or reduce sample count to 60.
-Benchmarking sled_write: Collecting 100 samples in estimated 5.2621 s (5050 iterations)
+Benchmarking sled_write: Collecting 100 samples in estimated 9.9439 s (10k iterations)
 Benchmarking sled_write: Analyzing
-sled_write              time:   [1.0044 ms 1.0101 ms 1.0158 ms]
-                        change: [-17.900% -16.790% -15.687%] (p = 0.00 < 0.05)
+sled_write              time:   [987.86 us 993.47 us 999.38 us]
+                        change: [-11.849% -10.949% -10.012%] (p = 0.00 < 0.05)
                         Performance has improved.
-Found 8 outliers among 100 measurements (8.00%)
-  6 (6.00%) low mild
-  1 (1.00%) high mild
-  1 (1.00%) high severe
+Found 6 outliers among 100 measurements (6.00%)
+  3 (3.00%) low mild
+  3 (3.00%) high mild
 
 Benchmarking kvs_read
 Benchmarking kvs_read: Warming up for 3.0000 s
-Benchmarking kvs_read: Collecting 100 samples in estimated 5.0716 s (1100 iterations)
+Benchmarking kvs_read: Collecting 100 samples in estimated 5.1138 s (1100 iterations)
 Benchmarking kvs_read: Analyzing
-kvs_read                time:   [4.5991 ms 4.6012 ms 4.6034 ms]
-                        change: [-6.2746% -6.2157% -6.1513%] (p = 0.00 < 0.05)
+kvs_read                time:   [4.6400 ms 4.6436 ms 4.6483 ms]
+                        change: [-7.6337% -7.5493% -7.4456%] (p = 0.00 < 0.05)
                         Performance has improved.
-Found 4 outliers among 100 measurements (4.00%)
+Found 7 outliers among 100 measurements (7.00%)
+  1 (1.00%) low mild
   4 (4.00%) high mild
+  2 (2.00%) high severe
 
 Benchmarking sled_read
 Benchmarking sled_read: Warming up for 3.0000 s
-Benchmarking sled_read: Collecting 100 samples in estimated 5.0172 s (1200 iterations)
+Benchmarking sled_read: Collecting 100 samples in estimated 5.3165 s (1300 iterations)
 Benchmarking sled_read: Analyzing
-sled_read               time:   [4.1789 ms 4.2145 ms 4.2508 ms]
-                        change: [-13.395% -12.433% -11.491%] (p = 0.00 < 0.05)
-                        Performance has improved.
+sled_read               time:   [4.0218 ms 4.0539 ms 4.0875 ms]
+                        change: [+21.650% +23.002% +24.506%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+
+
+Process finished with exit code 0
