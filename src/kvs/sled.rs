@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use super::{KvsEngine, KvsError, Result};
 
 /// Sled storage engine
+#[derive(Clone, Debug)]
 pub struct SledKvsEngine {
 	db: sled::Db
 }
