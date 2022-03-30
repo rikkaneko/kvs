@@ -102,9 +102,8 @@ impl KvsEngine for KvStore {
 		}
 		
 		// Open and create the database file if not exist
-		let mut db_handle = OpenOptions::new().read(true).write(true).create(true).open(&db_path)?;
-		let mut db_reader = BufReader::new(db_handle.by_ref());
-		let mut db_writer = BufWriter::new(db_handle.by_ref());
+		let mut db_reader = BufReader::new(OpenOptions::new().read(true).write(true).create(true).open(&db_path)?);
+		let mut db_writer = BufWriter::new(OpenOptions::new().read(true).write(true).create(true).open(&db_path)?);
 		
 		// Check the present of the database header
 		let mut header = if db_path.metadata()?.len() != 0 {
@@ -150,7 +149,7 @@ impl KvsEngine for KvStore {
 			KvStore::write_index(&index, &index_path)?;
 		}
 		
-		let mut store = KvStoreInt {
+		let store = KvStoreInt {
 			header,
 			index,
 			modified: false,
@@ -168,7 +167,7 @@ impl KvsEngine for KvStore {
 
 impl KvStore {
 	const BUILD_NUMBER: u64 = 1200;
-	const MIN_COMPACTION_THRESHOLD: u64 = 8192;
+	const MIN_COMPACTION_THRESHOLD: u64 = 32768;
 	
 	fn check_compaction(&self) -> Result<bool> {
 		// Block any read/write operation until compaction completed
@@ -184,28 +183,27 @@ impl KvStore {
 	/// Do compaction if the database file size reaches threshold
 	fn compaction(&self) -> Result<()> {
 		let _lock = self.compaction_guard.write().unwrap();
-		let store = self.store.write().unwrap();
+		let mut store = self.store.write().unwrap();
 		// Avoid negative indication
 		if store.db_offset < store.header.next_compaction_size {
 			return Ok(())
 		}
 		
 		let mut entries = HashMap::new();
-		let mut handle = OpenOptions::new().read(true).write(true).open(*self.db_path)?;
-		let mut reader: BufReader<File> = BufReader::new(handle.try_clone()?);
-		let mut writer: BufWriter<File> = BufWriter::new(handle.try_clone()?)?;
+		let mut reader: BufReader<File> = BufReader::new(OpenOptions::new().read(true).open(&*self.db_path)?);
 		
 		for (key, offset) in store.index.iter() {
 			reader.seek(SeekFrom::Start(*offset))?;
 			if let Ok(KvsEntries::SET(key_, value)) = bson::from_reader::<_, KvsEntries>(&mut reader) {
-				if key == key_ { entries.insert(key_, value); }
+				if key_ == *key { entries.insert(key_, value); }
 				else { return Err(KvsError::InvalidDataEntry) }
 			}
 		}
 		
+		drop(reader);
 		// Clear file content
-		handle.set_len(0)?;
-		
+		let mut writer: BufWriter<File> = BufWriter::new(OpenOptions::new().write(true).truncate(true).open(&*self.db_path)?);
+
 		// Build header
 		let mut offset = KvStore::write_header(&store.header, &mut writer)?;
 		// Reset old index
@@ -222,7 +220,7 @@ impl KvStore {
 		
 		// Estimate next compaction size: Double the current size
 		// Update header
-		store.header.next_compaction_size = max(handle.metadata()?.len() * 2, KvStore::MIN_COMPACTION_THRESHOLD);
+		store.header.next_compaction_size = max(store.db_offset * 2, KvStore::MIN_COMPACTION_THRESHOLD);
 		KvStore::write_header(&store.header, &mut writer)?;
 		
 		Ok(())
@@ -230,7 +228,7 @@ impl KvStore {
 	
 	/// Insert entry to the database file
 	fn writeback(&self, entry: KvsEntries) -> Result<()> {
-		let mut handle = OpenOptions::new().write(true).open(*self.db_path)?;
+		let mut handle = OpenOptions::new().write(true).open(&*self.db_path)?;
 		let ent_bytes = bson::to_vec(&entry)?;
 		let _lock = self.compaction_guard.read().unwrap(); // Block compaction until completed
 		let offset = {
@@ -244,17 +242,17 @@ impl KvStore {
 		handle.seek(SeekFrom::Start(offset))?;
 		handle.write_all(ent_bytes.as_slice())?;
 		
-		let store = self.store.write().unwrap();
+		let mut store = self.store.write().unwrap();
 		match entry {
 			KvsEntries::SET(key, _) => 'blk1:{
 				if let Some(offset_) = store.index.get(&key)  {
-					if offset_ > *offset { break 'blk1; }
+					if *offset_ > offset { break 'blk1; }
 				}
-				store.index.insert(key.to_owned(), offset);
+				store.index.insert(key, offset);
 			},
 			KvsEntries::DELETE(key) => 'blk2:{
 				if let Some(offset_) = store.index.get(&key) {
-					if offset_ > *offset { break 'blk2; }
+					if *offset_ > offset { break 'blk2; }
 				}
 				store.index.remove(&key);
 			}
@@ -273,8 +271,8 @@ impl KvStore {
 		let _lock = self.compaction_guard.read().unwrap(); // Block compaction until completed
 		let result = self.store.read().unwrap().index.get(&key).cloned();
 		if let Some(offset) = result {
-			let mut handle = OpenOptions::new().read(true).open(*self.db_path)?;
-			handle.seek(SeekFrom::Start(offset));
+			let mut handle = OpenOptions::new().read(true).open(&*self.db_path)?;
+			handle.seek(SeekFrom::Start(offset))?;
 			if let Ok(KvsEntries::SET(key_, value)) = bson::from_reader::<_, KvsEntries>(handle.by_ref()) {
 				if key == key_ {
 					return Ok(Some(value))
@@ -285,7 +283,7 @@ impl KvStore {
 	}
 	
 	/// Rewrite the current index file
-	fn write_index<W: Write + Seek>(index: &HashMap<String, u64>, db_path: &PathBuf) -> Result<()> {
+	fn write_index(index: &HashMap<String, u64>, db_path: &PathBuf) -> Result<()> {
 		let mut handle = OpenOptions::new().write(true).truncate(true).create(true).open(db_path)?;
 		let mut writer = BufWriter::new(handle.by_ref());
 		for (key, offset) in index.iter() {
@@ -310,15 +308,14 @@ impl KvStore {
 
 impl Drop for KvStore {
 	fn drop(&mut self) {
-		let mut handle = OpenOptions::new().read(true).write(true).open(&self.db_path).unwrap();
-		let store = self.store.read().unwrap();
+		let mut store = self.store.write().unwrap();
 		// Rewrite index if modified
 		if store.modified {
 			// Rewrite index file
-			KvStore::write_index(&store.index, &self.index_path)?;
+			KvStore::write_index(&store.index, &self.index_path).unwrap();
 		}
 		// Set last_graceful_exit bit
-		self.header.flags = 0x0;
-		KvStore::write_header(&store.header, handle.by_ref()).unwrap();
+		store.header.flags = 0x0;
+		KvStore::write_header(&store.header, OpenOptions::new().write(true).open(&*self.db_path).unwrap()).unwrap();
 	}
 }

@@ -18,8 +18,9 @@
 
 use std::path::PathBuf;
 use super::Result;
+use dyn_clone::DynClone;
 
-pub trait KvsEngine: Clone + Send + 'static {
+pub trait KvsEngine: DynClone + Send + 'static {
 	/// Get the string value of a given string key
 	fn set(&self, key: String, value: String) -> Result<()>;
 	/// Get the string value of a given string key
@@ -29,3 +30,5 @@ pub trait KvsEngine: Clone + Send + 'static {
 	/// Create or open KvStore instance
 	fn open(path: impl Into<PathBuf>) -> Result<Self> where Self: Sized;
 }
+
+dyn_clone::clone_trait_object!(KvsEngine);
