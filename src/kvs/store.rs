@@ -22,6 +22,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use super::{KvsEngine, KvsError, Result};
 use serde::{Deserialize, Serialize};
@@ -31,7 +32,8 @@ struct KvStoreInt {
 	header: KvHeader,
 	index: HashMap<String, u64>,
 	modified: bool, // Trigger index update when drop
-	db_offset: u64 // Current database file end
+	db_path: PathBuf,
+	index_path: PathBuf
 }
 
 #[derive(Clone, Debug)]
@@ -39,7 +41,7 @@ pub struct KvStore {
 	store: Arc<RwLock<KvStoreInt>>,
 	compaction_guard: Arc<RwLock<()>>,
 	db_path: Arc<PathBuf>,
-	index_path: Arc<PathBuf>
+	db_offset: Arc<AtomicU64> // Next writable database file offset
 }
 
 // In-disk data format for KvStore database file entries
@@ -153,14 +155,15 @@ impl KvsEngine for KvStore {
 			header,
 			index,
 			modified: false,
-			db_offset: db_reader.seek(SeekFrom::End(0))?
+			db_path: db_path.clone(),
+			index_path
 		};
 		
 		Ok(KvStore {
 			store: Arc::new(RwLock::new(store)),
 			compaction_guard: Arc::new(RwLock::new(())),
 			db_path: Arc::new(db_path),
-			index_path: Arc::new(index_path)
+			db_offset: Arc::new(AtomicU64::new(db_reader.seek(SeekFrom::End(0))?))
 		})
 	}
 }
@@ -172,9 +175,7 @@ impl KvStore {
 	fn check_compaction(&self) -> Result<bool> {
 		// Block any read/write operation until compaction completed
 		// Also, wait for other read/write operation to complete
-		let store = self.store.read().unwrap();
-		if store.db_offset >= store.header.next_compaction_size {
-			drop(store); // Avoid deadlock
+		if self.db_offset.load(Ordering::Relaxed) >= self.store.read().unwrap().header.next_compaction_size {
 			self.compaction()?;
 			Ok(true)
 		} else { Ok(false) }
@@ -185,12 +186,12 @@ impl KvStore {
 		let _lock = self.compaction_guard.write().unwrap();
 		let mut store = self.store.write().unwrap();
 		// Avoid negative indication
-		if store.db_offset < store.header.next_compaction_size {
+		if self.db_offset.load(Ordering::Relaxed) < store.header.next_compaction_size {
 			return Ok(())
 		}
 		
 		let mut entries = HashMap::new();
-		let mut reader: BufReader<File> = BufReader::new(OpenOptions::new().read(true).open(&*self.db_path)?);
+		let mut reader: BufReader<File> = BufReader::new(OpenOptions::new().read(true).open(&store.db_path)?);
 		
 		for (key, offset) in store.index.iter() {
 			reader.seek(SeekFrom::Start(*offset))?;
@@ -202,7 +203,7 @@ impl KvStore {
 		
 		drop(reader);
 		// Clear file content
-		let mut writer: BufWriter<File> = BufWriter::new(OpenOptions::new().write(true).truncate(true).open(&*self.db_path)?);
+		let mut writer: BufWriter<File> = BufWriter::new(OpenOptions::new().write(true).truncate(true).open(&*store.db_path)?);
 
 		// Build header
 		let mut offset = KvStore::write_header(&store.header, &mut writer)?;
@@ -215,13 +216,13 @@ impl KvStore {
 			offset = writer.seek(SeekFrom::Current(0))?;
 		}
 		
-		// Reset db_offset
-		store.db_offset = writer.seek(SeekFrom::End(0))?;
-		
 		// Estimate next compaction size: Double the current size
 		// Update header
-		store.header.next_compaction_size = max(store.db_offset * 2, KvStore::MIN_COMPACTION_THRESHOLD);
+		store.header.next_compaction_size = max(self.db_offset.load(Ordering::Relaxed) * 2, KvStore::MIN_COMPACTION_THRESHOLD);
 		KvStore::write_header(&store.header, &mut writer)?;
+		
+		// Reset db_offset
+		self.db_offset.store(writer.seek(SeekFrom::End(0))?, Ordering::Relaxed);
 		
 		Ok(())
 	}
@@ -231,13 +232,7 @@ impl KvStore {
 		let mut handle = OpenOptions::new().write(true).open(&*self.db_path)?;
 		let ent_bytes = bson::to_vec(&entry)?;
 		let _lock = self.compaction_guard.read().unwrap(); // Block compaction until completed
-		let offset = {
-			// Atomically reserve space for the entry
-			let mut store = self.store.write().unwrap();
-			let curr = store.db_offset;
-			store.db_offset += ent_bytes.len() as u64;
-			curr
-		};
+		let offset = self.db_offset.fetch_add(ent_bytes.len() as u64, Ordering::Relaxed);
 		// Write the entry with the specified offset
 		handle.seek(SeekFrom::Start(offset))?;
 		handle.write_all(ent_bytes.as_slice())?;
@@ -306,16 +301,15 @@ impl KvStore {
 	}
 }
 
-impl Drop for KvStore {
+impl Drop for KvStoreInt {
 	fn drop(&mut self) {
-		let mut store = self.store.write().unwrap();
 		// Rewrite index if modified
-		if store.modified {
+		if self.modified {
 			// Rewrite index file
-			KvStore::write_index(&store.index, &self.index_path).unwrap();
+			KvStore::write_index(&self.index, &self.index_path).unwrap();
 		}
 		// Set last_graceful_exit bit
-		store.header.flags = 0x0;
-		KvStore::write_header(&store.header, OpenOptions::new().write(true).open(&*self.db_path).unwrap()).unwrap();
+		self.header.flags = 0x0;
+		KvStore::write_header(&self.header, OpenOptions::new().write(true).open(&*self.db_path).unwrap()).unwrap();
 	}
 }
