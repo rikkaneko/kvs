@@ -24,6 +24,7 @@ use super::SledKvsEngine;
 use serde::{Deserialize, Serialize};
 
 pub struct KvsServer {
+	// TODO Alternative way to hold KvsEngine objects
 	store: Box<dyn KvsEngine>,
 	need_termination: bool
 }

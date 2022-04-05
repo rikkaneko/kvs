@@ -18,14 +18,17 @@
 
 use std::path::PathBuf;
 use super::Result;
+use dyn_clone::DynClone;
 
-pub trait KvsEngine {
+pub trait KvsEngine: DynClone + Send + 'static {
 	/// Get the string value of a given string key
-	fn set(&mut self, key: String, value: String) -> Result<()>;
+	fn set(&self, key: String, value: String) -> Result<()>;
 	/// Get the string value of a given string key
 	fn get(&self, key: String) -> Result<Option<String>>;
 	/// Remove a given key `key`
-	fn remove(&mut self, key: String) -> Result<()>;
+	fn remove(&self, key: String) -> Result<()>;
 	/// Create or open KvStore instance
 	fn open(path: impl Into<PathBuf>) -> Result<Self> where Self: Sized;
 }
+
+dyn_clone::clone_trait_object!(KvsEngine);

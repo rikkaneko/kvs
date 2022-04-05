@@ -19,11 +19,12 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use kvs::kvs::{KvsEngine, KvStore, SledKvsEngine};
 use rand::distributions::{Distribution, Uniform, Alphanumeric};
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand::rngs::StdRng;
 use tempfile::TempDir;
 
 fn gen_random_string(n: usize) -> String {
-	rand::thread_rng()
+	StdRng::seed_from_u64(1145141919810)
 		.sample_iter(&Alphanumeric)
 		.take(n)
 		.map(char::from)
@@ -34,7 +35,7 @@ fn kvs_benches(c: &mut Criterion) {
 	let mut samples: Vec<(String, String)> = Vec::new();
 	let temp_dir_kvs = TempDir::new().expect("unable to create temporary working directory");
 	let temp_dir_sled = TempDir::new().expect("unable to create temporary working directory");
-	let mut rng = rand::thread_rng();
+	let mut rng = StdRng::seed_from_u64(1145141919810);
 	let uniform = Uniform::<usize>::from(1..=10000);
 	samples.reserve(100);
 	

@@ -24,6 +24,7 @@ mod sled;
 mod errors;
 
 // Public export symbol
+pub mod util;
 pub use self::store::KvStore;
 pub use self::engine::KvsEngine;
 pub use self::server::KvsServer;
