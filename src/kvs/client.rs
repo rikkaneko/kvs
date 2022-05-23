@@ -21,77 +21,77 @@ use std::net::{SocketAddr, TcpStream};
 use super::{KvsError, KvsCmdRequest, KvsServerReply, KvsServerReplyStatus, Result};
 
 pub struct KvsClient {
-	addr: SocketAddr
+    addr: SocketAddr
 }
 
 impl KvsClient {
-	/// Get the string value of a given string key
-	pub fn set(&mut self, key: String, value: String) -> Result<()> {
-		let reply = self.send_and_fetch(KvsCmdRequest {
-			cmd: "SET".to_owned(),
-			argument: vec![key.to_owned(), value]
-		})?;
-		
-		match reply.status {
-			KvsServerReplyStatus::Success => Ok(()),
-			KvsServerReplyStatus::KeyNotFound => Err(KvsError::KeyNotExist(key)),
-			_ => Err(KvsError::ServerError)
-		}
-	}
-	
-	/// Get the string value of a given string key
-	pub fn get(&mut self, key: String) -> Result<Option<String>> {
-		let reply = self.send_and_fetch(KvsCmdRequest {
-			cmd: "GET".to_owned(),
-			argument: vec![key]
-		})?;
-		
-		match reply.status {
-			KvsServerReplyStatus::Success => Ok(reply.result),
-			_ => Err(KvsError::ServerError)
-		}
-	}
-	
-	/// Remove a given key `key`
-	pub fn remove(&mut self, key: String) -> Result<()> {
-		let reply = self.send_and_fetch(KvsCmdRequest {
-			cmd: "REMOVE".to_owned(),
-			argument: vec![key.to_owned()]
-		})?;
-		
-		match reply.status {
-			KvsServerReplyStatus::Success => Ok(()),
-			KvsServerReplyStatus::KeyNotFound => Err(KvsError::KeyNotExist(key)),
-			_ => Err(KvsError::ServerError)
-		}
-	}
-	
-	/// Establish connection to KvsServer
-	pub fn open(addr: &str) -> Result<KvsClient> {
-		Ok(KvsClient {
-			addr: addr.parse()?
-		})
-	}
-	
-	pub fn send_terminate_signal(&mut self) -> Result<()> {
-		let reply = self.send_and_fetch(KvsCmdRequest {
-			cmd: "KILL".to_owned(),
-			argument: Vec::new()
-		})?;
-		
-		match reply.status {
-			KvsServerReplyStatus::Success => Ok(()),
-			_ => Err(KvsError::ServerError)
-		}
-	}
-	
-	fn send_and_fetch(&mut self, request: KvsCmdRequest) -> Result<KvsServerReply> {
-		// Send request
-		let mut conn = TcpStream::connect(self.addr)?;
-		conn.write_all(bson::to_vec(&request)?.as_slice())?;
-		let mut buf = [0; 1024];
-		// Wait for server reply
-		let len = conn.read(&mut buf)?;
-		Ok(bson::from_slice::<KvsServerReply>(&buf[..len])?)
-	}
+    /// Get the string value of a given string key
+    pub fn set(&mut self, key: String, value: String) -> Result<()> {
+        let reply = self.send_and_fetch(KvsCmdRequest {
+            cmd: "SET".to_owned(),
+            argument: vec![key.to_owned(), value]
+        })?;
+        
+        match reply.status {
+            KvsServerReplyStatus::Success => Ok(()),
+            KvsServerReplyStatus::KeyNotFound => Err(KvsError::KeyNotExist(key)),
+            _ => Err(KvsError::ServerError)
+        }
+    }
+    
+    /// Get the string value of a given string key
+    pub fn get(&mut self, key: String) -> Result<Option<String>> {
+        let reply = self.send_and_fetch(KvsCmdRequest {
+            cmd: "GET".to_owned(),
+            argument: vec![key]
+        })?;
+        
+        match reply.status {
+            KvsServerReplyStatus::Success => Ok(reply.result),
+            _ => Err(KvsError::ServerError)
+        }
+    }
+    
+    /// Remove a given key `key`
+    pub fn remove(&mut self, key: String) -> Result<()> {
+        let reply = self.send_and_fetch(KvsCmdRequest {
+            cmd: "REMOVE".to_owned(),
+            argument: vec![key.to_owned()]
+        })?;
+        
+        match reply.status {
+            KvsServerReplyStatus::Success => Ok(()),
+            KvsServerReplyStatus::KeyNotFound => Err(KvsError::KeyNotExist(key)),
+            _ => Err(KvsError::ServerError)
+        }
+    }
+    
+    /// Establish connection to KvsServer
+    pub fn open(addr: &str) -> Result<KvsClient> {
+        Ok(KvsClient {
+            addr: addr.parse()?
+        })
+    }
+    
+    pub fn send_terminate_signal(&mut self) -> Result<()> {
+        let reply = self.send_and_fetch(KvsCmdRequest {
+            cmd: "KILL".to_owned(),
+            argument: Vec::new()
+        })?;
+        
+        match reply.status {
+            KvsServerReplyStatus::Success => Ok(()),
+            _ => Err(KvsError::ServerError)
+        }
+    }
+    
+    fn send_and_fetch(&mut self, request: KvsCmdRequest) -> Result<KvsServerReply> {
+        // Send request
+        let mut conn = TcpStream::connect(self.addr)?;
+        conn.write_all(bson::to_vec(&request)?.as_slice())?;
+        let mut buf = [0; 1024];
+        // Wait for server reply
+        let len = conn.read(&mut buf)?;
+        Ok(bson::from_slice::<KvsServerReply>(&buf[..len])?)
+    }
 }

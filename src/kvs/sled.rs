@@ -22,32 +22,32 @@ use super::{KvsEngine, KvsError, Result};
 /// Sled storage engine
 #[derive(Clone, Debug)]
 pub struct SledKvsEngine {
-	db: sled::Db
+    db: sled::Db
 }
 
 impl KvsEngine for SledKvsEngine {
-	fn set(&self, key: String, value: String) -> Result<()> {
-		self.db.insert(key.as_bytes(), value.as_bytes())?;
-		// Add flush
-		self.db.flush()?;
-		Ok(())
-	}
-	
-	fn get(&self, key: String) -> Result<Option<String>> {
-		Ok(self.db.get(key.as_bytes())?.map(|result| String::from_utf8_lossy(result.as_ref()).to_string()))
-	}
-	
-	fn remove(&self, key: String) -> Result<()> {
-		if self.db.remove(key.as_bytes())?.is_some() {
-			// Add flush
-			self.db.flush()?;
-			Ok(())
-		} else { Err(KvsError::KeyNotExist(key)) }
-	}
-	
-	fn open(path: impl Into<PathBuf>) -> Result<Self> {
-		Ok(SledKvsEngine {
-			db: sled::open(path.into())?
-		})
-	}
+    fn set(&self, key: String, value: String) -> Result<()> {
+        self.db.insert(key.as_bytes(), value.as_bytes())?;
+        // Add flush
+        self.db.flush()?;
+        Ok(())
+    }
+    
+    fn get(&self, key: String) -> Result<Option<String>> {
+        Ok(self.db.get(key.as_bytes())?.map(|result| String::from_utf8_lossy(result.as_ref()).to_string()))
+    }
+    
+    fn remove(&self, key: String) -> Result<()> {
+        if self.db.remove(key.as_bytes())?.is_some() {
+            // Add flush
+            self.db.flush()?;
+            Ok(())
+        } else { Err(KvsError::KeyNotExist(key)) }
+    }
+    
+    fn open(path: impl Into<PathBuf>) -> Result<Self> {
+        Ok(SledKvsEngine {
+            db: sled::open(path.into())?
+        })
+    }
 }

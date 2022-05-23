@@ -20,44 +20,44 @@ use super::Result;
 use std::thread;
 
 pub trait ThreadPool {
-	/// Creates a new thread pool, immediately spawning the specified number of threads
-	fn new(thread: u32) -> Result<Self> where Self: Sized;
-	/// Spawn a function into the thread pool
-	fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static;
+    /// Creates a new thread pool, immediately spawning the specified number of threads
+    fn new(thread: u32) -> Result<Self> where Self: Sized;
+    /// Spawn a function into the thread pool
+    fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static;
 }
 
 pub struct NaiveThreadPool;
 
 impl ThreadPool for NaiveThreadPool {
-	fn new(thread: u32) -> Result<Self> where Self: Sized {
-		Ok(NaiveThreadPool)
-	}
-	
-	fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static {
-		thread::spawn(job);
-	}
+    fn new(thread: u32) -> Result<Self> where Self: Sized {
+        Ok(NaiveThreadPool)
+    }
+    
+    fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static {
+        thread::spawn(job);
+    }
 }
 
 pub struct SharedQueueThreadPool;
 
 impl ThreadPool for SharedQueueThreadPool {
-	fn new(thread: u32) -> Result<Self> where Self: Sized {
-		todo!()
-	}
-	
-	fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static {
-		todo!()
-	}
+    fn new(thread: u32) -> Result<Self> where Self: Sized {
+        todo!()
+    }
+    
+    fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static {
+        todo!()
+    }
 }
 
 pub struct RayonThreadPool;
 
 impl ThreadPool for RayonThreadPool {
-	fn new(thread: u32) -> Result<Self> where Self: Sized {
-		todo!()
-	}
-	
-	fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static {
-		todo!()
-	}
+    fn new(thread: u32) -> Result<Self> where Self: Sized {
+        todo!()
+    }
+    
+    fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static {
+        todo!()
+    }
 }

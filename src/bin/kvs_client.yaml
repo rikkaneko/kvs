@@ -10,7 +10,7 @@ args:
     takes_value: true
     global: true
     default_value: "127.0.0.1:4000"
-    
+
 subcommands:
 - set:
     about: "Set the value of a string key to a string"
@@ -19,7 +19,7 @@ subcommands:
         required: true
     - VALUE:
         required: true
-        
+
 - get:
     about: "Get the string value of a given string key"
     args:
@@ -30,6 +30,6 @@ subcommands:
     args:
     - KEY:
         required: true
-        
+
 - terminate:
     about: "Terminate remote server"

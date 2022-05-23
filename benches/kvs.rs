@@ -24,81 +24,79 @@ use rand::rngs::StdRng;
 use tempfile::TempDir;
 
 fn gen_random_string(n: usize) -> String {
-	StdRng::seed_from_u64(1145141919810)
-		.sample_iter(&Alphanumeric)
-		.take(n)
-		.map(char::from)
-		.collect()
+    StdRng::seed_from_u64(1145141919810)
+        .sample_iter(&Alphanumeric)
+        .take(n)
+        .map(char::from)
+        .collect()
 }
 
 fn kvs_benches(c: &mut Criterion) {
-	let mut samples: Vec<(String, String)> = Vec::new();
-	let temp_dir_kvs = TempDir::new().expect("unable to create temporary working directory");
-	let temp_dir_sled = TempDir::new().expect("unable to create temporary working directory");
-	let mut rng = StdRng::seed_from_u64(1145141919810);
-	let uniform = Uniform::<usize>::from(1..=10000);
-	samples.reserve(100);
-	
-	for _ in 1..=100 {
-		samples.push(
-			(gen_random_string(uniform.sample(&mut rng)), gen_random_string(uniform.sample(&mut rng))))
-	}
-	
-	// With the kvs engine, write 100 values with random keys of length 1-100000 bytes and random values of length 1-100000 bytes
-	c.bench_function("kvs_write", |b| {
-		b.iter(|| {
-			let mut store = KvStore::open(temp_dir_kvs.path()).expect("Unable to open the database");
-			for i in 0..100 {
-				let (key, value) = samples.get(i).unwrap();
-				store.set(key.to_owned(), value.to_owned()).expect("Unable to write to the database");
-			}
-		});
-	});
-	
-	// With the sled engine, write 100 values with random keys of length 1-100000 bytes and random values of length 1-100000 bytes
-	c.bench_function("sled_write", |b| {
-		b.iter(|| {
-			let mut store = SledKvsEngine::open(temp_dir_sled.path()).expect("Unable to open the database");
-			for i in 0..100 {
-				let (key, value) = samples.get(i).unwrap();
-				store.set(key.to_owned(), value.to_owned()).expect("Unable to write to the database");
-			}
-		});
-	});
-	
-	// With the kvs engine, read 1000 values from previously written keys, with keys and values of random length
-	c.bench_function("kvs_read", |b| {
-		b.iter(|| {
-			let store = KvStore::open(temp_dir_kvs.path()).expect("Unable to open the database");
-			for _ in 0..10 {
-				for i in 0..100 {
-					let (key, value) = samples.get(i).unwrap();
-					if store.get(key.to_owned())
-						.expect("Unable to read from the database").unwrap().ne(value) {
-						panic!("Should not be here")
-					}
-				}
-			}
-		});
-	});
-	
-	// With the sled engine, read 1000 values from previously written keys, with keys and values of random length
-	c.bench_function("sled_read", |b| {
-		b.iter(|| {
-			let store = SledKvsEngine::open(temp_dir_sled.path()).expect("Unable to open the database");
-			for _ in 0..10 {
-				for i in 0..100 {
-					let (key, value) = samples.get(i).unwrap();
-					if store.get(key.to_owned())
-							.expect("Unable to read from the database").unwrap().ne(value) {
-						panic!("Should not be here")
-					}
-				}
-			}
-		});
-	});
-	
-	
+    let mut samples: Vec<(String, String)> = Vec::new();
+    let temp_dir_kvs = TempDir::new().expect("unable to create temporary working directory");
+    let temp_dir_sled = TempDir::new().expect("unable to create temporary working directory");
+    let mut rng = StdRng::seed_from_u64(1145141919810);
+    let uniform = Uniform::<usize>::from(1..=10000);
+    samples.reserve(100);
+    
+    for _ in 1..=100 {
+        samples.push(
+            (gen_random_string(uniform.sample(&mut rng)), gen_random_string(uniform.sample(&mut rng))))
+    }
+    
+    // With the kvs engine, write 100 values with random keys of length 1-100000 bytes and random values of length 1-100000 bytes
+    c.bench_function("kvs_write", |b| {
+        b.iter(|| {
+            let mut store = KvStore::open(temp_dir_kvs.path()).expect("Unable to open the database");
+            for i in 0..100 {
+                let (key, value) = samples.get(i).unwrap();
+                store.set(key.to_owned(), value.to_owned()).expect("Unable to write to the database");
+            }
+        });
+    });
+    
+    // With the sled engine, write 100 values with random keys of length 1-100000 bytes and random values of length 1-100000 bytes
+    c.bench_function("sled_write", |b| {
+        b.iter(|| {
+            let mut store = SledKvsEngine::open(temp_dir_sled.path()).expect("Unable to open the database");
+            for i in 0..100 {
+                let (key, value) = samples.get(i).unwrap();
+                store.set(key.to_owned(), value.to_owned()).expect("Unable to write to the database");
+            }
+        });
+    });
+    
+    // With the kvs engine, read 1000 values from previously written keys, with keys and values of random length
+    c.bench_function("kvs_read", |b| {
+        b.iter(|| {
+            let store = KvStore::open(temp_dir_kvs.path()).expect("Unable to open the database");
+            for _ in 0..10 {
+                for i in 0..100 {
+                    let (key, value) = samples.get(i).unwrap();
+                    if store.get(key.to_owned())
+                            .expect("Unable to read from the database").unwrap().ne(value) {
+                        panic!("Should not be here")
+                    }
+                }
+            }
+        });
+    });
+    
+    // With the sled engine, read 1000 values from previously written keys, with keys and values of random length
+    c.bench_function("sled_read", |b| {
+        b.iter(|| {
+            let store = SledKvsEngine::open(temp_dir_sled.path()).expect("Unable to open the database");
+            for _ in 0..10 {
+                for i in 0..100 {
+                    let (key, value) = samples.get(i).unwrap();
+                    if store.get(key.to_owned())
+                            .expect("Unable to read from the database").unwrap().ne(value) {
+                        panic!("Should not be here")
+                    }
+                }
+            }
+        });
+    });
 }
 
 criterion_group!(benches, kvs_benches);

@@ -23,50 +23,50 @@ use clap::App;
 use kvs::kvs::{KvsEngine, KvStore, Result, KvsError};
 
 fn main() -> Result<()> {
-	let yaml = load_yaml!("kvs_cli.yaml");
-	let args = App::from_yaml(yaml)
-		.version(env!("CARGO_PKG_VERSION"))
-		.get_matches();
-	let mut kv = KvStore::open("kvs.db")?;
-	
-	match args.subcommand() {
-		("set", Some(matches)) => {
-			let key = matches.value_of("KEY").unwrap();
-			let value = matches.value_of("VALUE").unwrap();
-			if let Err(KvsError::KeyNotExist(_)) = kv.set(key.to_string(), value.to_string()) {
-				println!("Key not found");
-				exit(255);
-			}
-		},
-		
-		("get", Some(matches)) => {
-			let key = matches.value_of("KEY").unwrap();
-			match kv.get(key.to_string()) {
-				Ok(result) => {
-					if let Some(value) = result {
-						println!("{}", value);
-					} else {
-						println!("Key not found");
-					}
-				},
-				
-				Err(err) => {
-					println!("{}", err.to_string());
-					exit(255);
-				}
-			}
-		},
-		
-		("rm", Some(matches)) => {
-			let key = matches.value_of("KEY").unwrap();
-			if let Err(KvsError::KeyNotExist(_)) = kv.remove(key.to_string()) {
-				println!("Key not found");
-				exit(255);
-			}
-		},
-		
-		_ => { exit(1); }
-	}
-	
-	Ok(())
+    let yaml = load_yaml!("kvs_cli.yaml");
+    let args = App::from_yaml(yaml)
+        .version(env!("CARGO_PKG_VERSION"))
+        .get_matches();
+    let mut kv = KvStore::open("kvs.db")?;
+    
+    match args.subcommand() {
+        ("set", Some(matches)) => {
+            let key = matches.value_of("KEY").unwrap();
+            let value = matches.value_of("VALUE").unwrap();
+            if let Err(KvsError::KeyNotExist(_)) = kv.set(key.to_string(), value.to_string()) {
+                println!("Key not found");
+                exit(255);
+            }
+        },
+        
+        ("get", Some(matches)) => {
+            let key = matches.value_of("KEY").unwrap();
+            match kv.get(key.to_string()) {
+                Ok(result) => {
+                    if let Some(value) = result {
+                        println!("{}", value);
+                    } else {
+                        println!("Key not found");
+                    }
+                },
+                
+                Err(err) => {
+                    println!("{}", err.to_string());
+                    exit(255);
+                }
+            }
+        },
+        
+        ("rm", Some(matches)) => {
+            let key = matches.value_of("KEY").unwrap();
+            if let Err(KvsError::KeyNotExist(_)) = kv.remove(key.to_string()) {
+                println!("Key not found");
+                exit(255);
+            }
+        },
+        
+        _ => { exit(1); }
+    }
+    
+    Ok(())
 }

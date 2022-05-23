@@ -9,14 +9,14 @@ args:
     value_name: "IP-PORT"
     takes_value: true
     default_value: "127.0.0.1:4000"
-    
+
 - engine:
     long: "engine"
     help: 'If --engine is specified, then ENGINE-NAME must be either "kvs", in which case the built-in engine is used, or "sled", in which case sled is used. If this is the first run (there is no data previously persisted) then the default value is "kvs"; if there is previously persisted data then the default is the engine already in use. If data was previously persisted with a different engine than selected, print an error and exit with a non-zero exit code.'
     value_name: "ENGINE-NAME"
     takes_value: true
     default_value: "kvs"
-    
+
 - basedir:
     long: "base-dir"
     help: "Specify the base directory for database files. If --base-dir is not specified then the default path would be the current directory."

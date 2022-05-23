@@ -22,30 +22,30 @@ pub type Result<T> = std::result::Result<T, KvsError>;
 // Specified all error kind may occurred in kvs library
 #[derive(Error, Debug)]
 pub enum KvsError {
-	#[error(transparent)]
-	IOError(#[from] std::io::Error),
-	#[error(r#"Key "{0}" does not exist"#)]
-	KeyNotExist(String),
-	#[error("Invalid data entry")]
-	InvalidDataEntry,
-	#[error(transparent)]
-	SerializationError(#[from] bson::ser::Error),
-	#[error(transparent)]
-	DeserializationError(#[from] bson::de::Error),
-	#[error("Unsupported engine type")]
-	UnsupportedEngine,
-	#[error("Invalid database file format")]
-	InvalidDatabaseFormat,
-	#[error("Found incompatible database version {0}, current version {}")]
-	IncompatibleDatabaseVersion(u64, u64),
-	#[error(transparent)]
-	SystemTimeError(#[from] std::time::SystemTimeError),
-	#[error("Unknown protocol")]
-	UnknownProtocol,
-	#[error("Server internal error")]
-	ServerError,
-	#[error(transparent)]
-	InvalidAddress(#[from] std::net::AddrParseError),
-	#[error(transparent)]
-	SledError(#[from] sled::Error)
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+    #[error(r#"Key "{0}" does not exist"#)]
+    KeyNotExist(String),
+    #[error("Invalid data entry")]
+    InvalidDataEntry,
+    #[error(transparent)]
+    SerializationError(#[from] bson::ser::Error),
+    #[error(transparent)]
+    DeserializationError(#[from] bson::de::Error),
+    #[error("Unsupported engine type")]
+    UnsupportedEngine,
+    #[error("Invalid database file format")]
+    InvalidDatabaseFormat,
+    #[error("Found incompatible database version {0}, current version {}")]
+    IncompatibleDatabaseVersion(u64, u64),
+    #[error(transparent)]
+    SystemTimeError(#[from] std::time::SystemTimeError),
+    #[error("Unknown protocol")]
+    UnknownProtocol,
+    #[error("Server internal error")]
+    ServerError,
+    #[error(transparent)]
+    InvalidAddress(#[from] std::net::AddrParseError),
+    #[error(transparent)]
+    SledError(#[from] sled::Error)
 }
