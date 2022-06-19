@@ -40,7 +40,7 @@ struct KvStoreInt {
 pub struct KvStore {
     store: Arc<RwLock<KvStoreInt>>,
     compaction_guard: Arc<RwLock<()>>,
-    db_path: Arc<PathBuf>,
+    db_path: Box<PathBuf>,
     db_offset: Arc<AtomicU64> // Next writable database file offset
 }
 
@@ -162,7 +162,7 @@ impl KvsEngine for KvStore {
         Ok(KvStore {
             store: Arc::new(RwLock::new(store)),
             compaction_guard: Arc::new(RwLock::new(())),
-            db_path: Arc::new(db_path),
+            db_path: Box::new(db_path),
             db_offset: Arc::new(AtomicU64::new(db_reader.seek(SeekFrom::End(0))?))
         })
     }
@@ -253,11 +253,6 @@ impl KvStore {
             }
         }
         store.modified = true;
-        // Compaction condition should be checked with compaction guard
-        // Avoid recursive calling of compaction()
-        // if !self.is_compaction && self.file_db_handle.metadata()?.len() > self.header.next_compaction_size {
-        // 	self.compaction()?;
-        // }
         Ok(())
     }
     

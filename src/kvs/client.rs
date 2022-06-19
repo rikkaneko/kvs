@@ -20,13 +20,14 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use super::{KvsError, KvsCmdRequest, KvsServerReply, KvsServerReplyStatus, Result};
 
+#[derive(Clone)]
 pub struct KvsClient {
     addr: SocketAddr
 }
 
 impl KvsClient {
     /// Get the string value of a given string key
-    pub fn set(&mut self, key: String, value: String) -> Result<()> {
+    pub fn set(&self, key: String, value: String) -> Result<()> {
         let reply = self.send_and_fetch(KvsCmdRequest {
             cmd: "SET".to_owned(),
             argument: vec![key.to_owned(), value]
@@ -40,7 +41,7 @@ impl KvsClient {
     }
     
     /// Get the string value of a given string key
-    pub fn get(&mut self, key: String) -> Result<Option<String>> {
+    pub fn get(&self, key: String) -> Result<Option<String>> {
         let reply = self.send_and_fetch(KvsCmdRequest {
             cmd: "GET".to_owned(),
             argument: vec![key]
@@ -53,7 +54,7 @@ impl KvsClient {
     }
     
     /// Remove a given key `key`
-    pub fn remove(&mut self, key: String) -> Result<()> {
+    pub fn remove(&self, key: String) -> Result<()> {
         let reply = self.send_and_fetch(KvsCmdRequest {
             cmd: "REMOVE".to_owned(),
             argument: vec![key.to_owned()]
@@ -85,7 +86,7 @@ impl KvsClient {
         }
     }
     
-    fn send_and_fetch(&mut self, request: KvsCmdRequest) -> Result<KvsServerReply> {
+    fn send_and_fetch(&self, request: KvsCmdRequest) -> Result<KvsServerReply> {
         // Send request
         let mut conn = TcpStream::connect(self.addr)?;
         conn.write_all(bson::to_vec(&request)?.as_slice())?;

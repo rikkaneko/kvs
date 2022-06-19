@@ -19,14 +19,18 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use super::{KvsEngine, KvsError, KvStore, Result};
+use super::util::{NaiveThreadPool, ThreadPool};
 use super::SledKvsEngine;
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone)]
 pub struct KvsServer {
     // TODO Alternative way to hold KvsEngine objects
-    store: Box<dyn KvsEngine>,
-    need_termination: bool
+    store: Box<dyn KvsEngine + Sync>,
+    need_termination: Arc<AtomicBool>
 }
 
 // Communication protocol for Client-Server request (in bson)
@@ -56,7 +60,7 @@ impl KvsServer {
     /// Open the database file with specified engine
     pub fn open(engine_type: &str, path: impl Into<PathBuf>) -> Result<KvsServer> {
         // Supported database engine: kvs, sled
-        let store: Box<dyn KvsEngine> = match engine_type.to_lowercase().as_ref() {
+        let store: Box<dyn KvsEngine + Sync> = match engine_type.to_lowercase().as_ref() {
             "kvs" => Box::new(KvStore::open(path)?),
             "sled" => Box::new(SledKvsEngine::open(path)?),
             _ => { return Err(KvsError::UnsupportedEngine) }
@@ -64,25 +68,29 @@ impl KvsServer {
         
         Ok(KvsServer {
             store,
-            need_termination: false
+            need_termination: Arc::new(AtomicBool::new(false))
         })
     }
     
     /// Start server listening on `addr`
     ///
     /// This method would not return util received termination signal or error
-    pub fn start(&mut self, addr: impl ToSocketAddrs) -> Result<()> {
+    pub fn start(&self, addr: impl ToSocketAddrs) -> Result<()> {
         let listener = TcpListener::bind(addr)?;
+        let thread_pool = NaiveThreadPool::new(8)?;
         for stream in listener.incoming().flatten() {
-            self.handle_stream(stream)?;
-            if self.need_termination { break; }
+            let handle = self.clone();
+            thread_pool.spawn(move || {
+                handle.handle_stream(stream).unwrap();
+            });
+            if self.need_termination.load(Ordering::Relaxed) { break; }
         }
         Ok(())
     }
     
     /// Handle request from client
     /// KvsServer currently support six command: GET, SET, RM, REMOVE, DELETE, KILL
-    fn handle_stream(&mut self, mut stream: TcpStream) -> Result<()> {
+    fn handle_stream(&self, mut stream: TcpStream) -> Result<()> {
         let mut buf = [0; 1024];
         let len = stream.read(&mut buf)?;
         if let Ok(request) = bson::from_slice::<KvsCmdRequest>(&buf[..len]) {
@@ -165,7 +173,7 @@ impl KvsServer {
                 // Termination
                 "KILL" => {
                     if request.argument.is_empty() {
-                        self.need_termination = true;
+                        self.need_termination.store(true, Ordering::Relaxed);
                         KvsServerReply {
                             result: None,
                             status: KvsServerReplyStatus::Success
