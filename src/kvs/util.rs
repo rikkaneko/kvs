@@ -1,6 +1,6 @@
 /*
  * This file is part of kvs.
- * Copyright (c) 2022 Joe Ma <rikkaneko23@gmail.com>
+ * Copyright (c) 2022-2023 Joe Ma <rikkaneko23@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -29,7 +29,7 @@ pub trait ThreadPool {
 pub struct NaiveThreadPool;
 
 impl ThreadPool for NaiveThreadPool {
-    fn new(thread: u32) -> Result<Self> where Self: Sized {
+    fn new(_thread: u32) -> Result<Self> where Self: Sized {
         Ok(NaiveThreadPool)
     }
     
@@ -41,11 +41,11 @@ impl ThreadPool for NaiveThreadPool {
 pub struct SharedQueueThreadPool;
 
 impl ThreadPool for SharedQueueThreadPool {
-    fn new(thread: u32) -> Result<Self> where Self: Sized {
+    fn new(_thread: u32) -> Result<Self> where Self: Sized {
         todo!()
     }
     
-    fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static {
+    fn spawn<F>(&self, _job: F) where F: FnOnce() + Send + 'static {
         todo!()
     }
 }
@@ -53,11 +53,11 @@ impl ThreadPool for SharedQueueThreadPool {
 pub struct RayonThreadPool;
 
 impl ThreadPool for RayonThreadPool {
-    fn new(thread: u32) -> Result<Self> where Self: Sized {
+    fn new(_thread: u32) -> Result<Self> where Self: Sized {
         todo!()
     }
     
-    fn spawn<F>(&self, job: F) where F: FnOnce() + Send + 'static {
+    fn spawn<F>(&self, _job: F) where F: FnOnce() + Send + 'static {
         todo!()
     }
 }

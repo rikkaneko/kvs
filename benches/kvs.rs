@@ -1,6 +1,6 @@
 /*
  * This file is part of kvs.
- * Copyright (c) 2022 Joe Ma <rikkaneko23@gmail.com>
+ * Copyright (c) 2022-2023 Joe Ma <rikkaneko23@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -47,7 +47,7 @@ fn kvs_benches(c: &mut Criterion) {
     // With the kvs engine, write 100 values with random keys of length 1-100000 bytes and random values of length 1-100000 bytes
     c.bench_function("kvs_write", |b| {
         b.iter(|| {
-            let mut store = KvStore::open(temp_dir_kvs.path()).expect("Unable to open the database");
+            let store = KvStore::open(temp_dir_kvs.path()).expect("Unable to open the database");
             for i in 0..100 {
                 let (key, value) = samples.get(i).unwrap();
                 store.set(key.to_owned(), value.to_owned()).expect("Unable to write to the database");
@@ -58,7 +58,7 @@ fn kvs_benches(c: &mut Criterion) {
     // With the sled engine, write 100 values with random keys of length 1-100000 bytes and random values of length 1-100000 bytes
     c.bench_function("sled_write", |b| {
         b.iter(|| {
-            let mut store = SledKvsEngine::open(temp_dir_sled.path()).expect("Unable to open the database");
+            let store = SledKvsEngine::open(temp_dir_sled.path()).expect("Unable to open the database");
             for i in 0..100 {
                 let (key, value) = samples.get(i).unwrap();
                 store.set(key.to_owned(), value.to_owned()).expect("Unable to write to the database");

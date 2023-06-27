@@ -1,6 +1,6 @@
 /*
  * This file is part of kvs.
- * Copyright (c) 2022 Joe Ma <rikkaneko23@gmail.com>
+ * Copyright (c) 2022-2023 Joe Ma <rikkaneko23@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -36,7 +36,7 @@ pub enum KvsError {
     UnsupportedEngine,
     #[error("Invalid database file format")]
     InvalidDatabaseFormat,
-    #[error("Found incompatible database version {0}, current version {}")]
+    #[error("Found incompatible database version {0}, current version {1}")]
     IncompatibleDatabaseVersion(u64, u64),
     #[error(transparent)]
     SystemTimeError(#[from] std::time::SystemTimeError),

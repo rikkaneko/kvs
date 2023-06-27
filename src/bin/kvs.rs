@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     let args = App::from_yaml(yaml)
         .version(env!("CARGO_PKG_VERSION"))
         .get_matches();
-    let mut kv = KvStore::open("kvs.db")?;
+    let kv = KvStore::open("kvs.db")?;
     
     match args.subcommand() {
         ("set", Some(matches)) => {
